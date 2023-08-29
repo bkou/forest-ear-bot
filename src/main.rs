@@ -14,10 +14,12 @@ use serenity::model::gateway::Ready;
 use serenity::prelude::*;
 use tracing::{error, info};
 
-use crate::commands::restart::*;
-use crate::commands::screenshot::*;
+use crate::commands::list_desktop::*;
 use crate::commands::list_process::*;
 use crate::commands::kill_process::*;
+use crate::commands::restart::*;
+use crate::commands::run_desktop_shortcut::*;
+use crate::commands::screenshot::*;
 
 pub struct ShardManagerContainer;
 
@@ -40,7 +42,7 @@ impl EventHandler for Handler {
 
 
 #[group]
-#[commands(restart, screenshot, list_process, kill_process)]
+#[commands(restart, screenshot, list_process, kill_process, list_desktop, run_desktop_shortcut)]
 struct General;
 
 #[tokio::main]
