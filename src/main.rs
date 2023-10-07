@@ -17,6 +17,7 @@ use tracing::{error, info};
 use crate::commands::list_desktop::*;
 use crate::commands::list_process::*;
 use crate::commands::kill_process::*;
+use crate::commands::read_config::*;
 use crate::commands::restart::*;
 use crate::commands::run_desktop_shortcut::*;
 use crate::commands::screenshot::*;
@@ -42,7 +43,7 @@ impl EventHandler for Handler {
 
 
 #[group]
-#[commands(restart, screenshot, list_process, kill_process, list_desktop, run_desktop_shortcut)]
+#[commands(restart, screenshot, list_process, kill_process, list_desktop, run_desktop_shortcut, read_config)]
 struct General;
 
 #[tokio::main]
@@ -64,7 +65,7 @@ async fn main() {
 
     // Create the framework
     let framework =
-        StandardFramework::new().configure(|c| c.owners(owners).prefix("!")).group(&GENERAL_GROUP);
+        StandardFramework::new().configure(|c| c.owners(owners).prefix("!F")).group(&GENERAL_GROUP);
 
     let intents = GatewayIntents::GUILD_MESSAGES
         | GatewayIntents::DIRECT_MESSAGES
