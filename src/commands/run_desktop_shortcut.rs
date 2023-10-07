@@ -10,13 +10,10 @@ use lnk::ShellLink;
 pub async fn run_desktop_shortcut(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
 
     if let Some(user_dirs) = UserDirs::new() {
-        println!("test");
         let filename = args.single::<String>()?;
         let path = user_dirs.desktop_dir().unwrap().join(&filename);
 
         let deref = ShellLink::open(path).unwrap();
-        //println!("{:#?}", deref);
-        //println!("{:#?}", deref.relative_path());
         Command::new(deref.relative_path().clone().unwrap())
             .spawn()
             .expect("command failed to start");
