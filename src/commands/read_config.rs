@@ -10,7 +10,7 @@ use lnk::ShellLink;
 #[command]
 pub async fn read_config(ctx: &Context, msg: &Message) -> CommandResult {
     if let Some(user_dirs) = UserDirs::new() {
-        let path = user_dirs.desktop_dir().unwrap().join("dedicatedserver.cfg");
+        let path = user_dirs.desktop_dir().unwrap().join("dedicatedserver.cfg.lnk");
 
         let deref = match ShellLink::open(path) {
             Err(_) => {
