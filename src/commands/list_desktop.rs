@@ -1,13 +1,12 @@
+use directories::UserDirs;
 use serenity::framework::standard::macros::command;
 use serenity::framework::standard::{Args, CommandResult};
 use serenity::model::prelude::*;
 use serenity::prelude::*;
 use std::fs;
-use directories::UserDirs;
 
 #[command]
 pub async fn list_desktop(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
-
     if let Some(user_dirs) = UserDirs::new() {
         let paths = fs::read_dir(user_dirs.desktop_dir().unwrap().as_os_str()).unwrap();
 
@@ -22,7 +21,6 @@ pub async fn list_desktop(ctx: &Context, msg: &Message, _args: Args) -> CommandR
             println!("Error sending message: {:?}", why);
         }
     }
-
 
     Ok(())
 }

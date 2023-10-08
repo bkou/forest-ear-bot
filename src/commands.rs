@@ -1,3 +1,4 @@
+pub mod backup;
 pub mod kill_process;
 pub mod list_desktop;
 pub mod list_process;

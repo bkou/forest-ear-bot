@@ -1,16 +1,19 @@
+use directories::UserDirs;
+use lnk::ShellLink;
 use serenity::framework::standard::macros::command;
 use serenity::framework::standard::CommandResult;
 use serenity::model::prelude::*;
 use serenity::prelude::*;
-use directories::UserDirs;
-use std::fs;
 use std::error::Error;
-use lnk::ShellLink;
+use std::fs;
 
 #[command]
 pub async fn read_config(ctx: &Context, msg: &Message) -> CommandResult {
     if let Some(user_dirs) = UserDirs::new() {
-        let path = user_dirs.desktop_dir().unwrap().join("dedicatedserver.cfg.lnk");
+        let path = user_dirs
+            .desktop_dir()
+            .unwrap()
+            .join("dedicatedserver.cfg.lnk");
 
         let deref = match ShellLink::open(path) {
             Err(_) => {
@@ -18,8 +21,10 @@ pub async fn read_config(ctx: &Context, msg: &Message) -> CommandResult {
                     println!("Error sending message: {:?}", why);
                 }
                 // Seriously I have no idea how to return the error.
-                return Err(Box::<dyn Error + std::marker::Send + Sync>::from("File not found."));
-            },
+                return Err(Box::<dyn Error + std::marker::Send + Sync>::from(
+                    "File not found.",
+                ));
+            }
             Ok(f) => f,
         };
         let contents = fs::read_to_string(&deref.relative_path().as_ref().unwrap())?;

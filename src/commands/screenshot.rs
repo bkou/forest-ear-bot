@@ -1,8 +1,8 @@
+use screenshots::Screen;
 use serenity::framework::standard::macros::command;
 use serenity::framework::standard::{Args, CommandResult};
 use serenity::model::prelude::*;
 use serenity::prelude::*;
-use screenshots::Screen;
 use std::env;
 
 #[command]
@@ -21,8 +21,8 @@ pub async fn screenshot(ctx: &Context, msg: &Message, _args: Args) -> CommandRes
                     // Add a timestamp for the current time
                     // This also accepts a r/fc3339 Timestamp
                     .timestamp(Timestamp::now())
-                })
-                .add_file(&temp_file)
+            })
+            .add_file(&temp_file)
         })
         .await;
 

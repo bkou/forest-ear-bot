@@ -13,8 +13,18 @@ pub async fn list_process(ctx: &Context, msg: &Message, mut args: Args) -> Comma
     let mut s = String::new();
     s.push_str("Found:\n");
     for process in sys.processes_by_name(process_name.as_str()) {
-        println!("listing [{}] {} {:?}", process.pid(), process.name(), process.disk_usage());
-        s.push_str(&format!("listing [{}] {} {:?}", process.pid(), process.name(), process.disk_usage()));
+        println!(
+            "listing [{}] {} {:?}",
+            process.pid(),
+            process.name(),
+            process.disk_usage()
+        );
+        s.push_str(&format!(
+            "listing [{}] {} {:?}",
+            process.pid(),
+            process.name(),
+            process.disk_usage()
+        ));
         s.push_str("\n");
     }
     if let Err(why) = msg.channel_id.say(&ctx.http, &s).await {
