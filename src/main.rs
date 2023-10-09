@@ -7,10 +7,19 @@ use std::sync::Arc;
 use serenity::async_trait;
 use serenity::client::bridge::gateway::ShardManager;
 use serenity::framework::standard::macros::group;
+use serenity::framework::standard::macros::help;
 use serenity::framework::StandardFramework;
+use serenity::framework::standard::{
+    help_commands,
+    Args,
+    CommandGroup,
+    CommandResult,
+    HelpOptions,
+};
 use serenity::http::Http;
 use serenity::model::event::ResumedEvent;
 use serenity::model::gateway::Ready;
+use serenity::model::prelude::{Message, UserId};
 use serenity::prelude::*;
 use tracing::{error, info};
 
@@ -55,6 +64,19 @@ impl EventHandler for Handler {
 )]
 struct General;
 
+#[help]
+async fn my_help(
+    context: &Context,
+    msg: &Message,
+    args: Args,
+    help_options: &'static HelpOptions,
+    groups: &[&'static CommandGroup],
+    owners: HashSet<UserId>,
+) -> CommandResult {
+    let _ = help_commands::with_embeds(context, msg, args, help_options, groups, owners).await;
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() {
     let token = env::var("DISCORD_TOKEN").expect("Expected a token in the environment");
@@ -75,7 +97,8 @@ async fn main() {
     // Create the framework
     let framework = StandardFramework::new()
         .configure(|c| c.owners(owners).prefix("!F"))
-        .group(&GENERAL_GROUP);
+        .group(&GENERAL_GROUP)
+        .help(&MY_HELP);
 
     let intents = GatewayIntents::GUILD_MESSAGES
         | GatewayIntents::DIRECT_MESSAGES
