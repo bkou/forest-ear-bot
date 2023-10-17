@@ -28,7 +28,7 @@ use crate::commands::kill_process::*;
 use crate::commands::list_desktop::*;
 use crate::commands::list_process::*;
 use crate::commands::read_config::*;
-use crate::commands::restart::*;
+use crate::commands::restart_server::*;
 use crate::commands::run_desktop_shortcut::*;
 use crate::commands::screenshot::*;
 
@@ -53,7 +53,7 @@ impl EventHandler for Handler {
 
 #[group]
 #[commands(
-    restart,
+    restart_server,
     screenshot,
     list_process,
     kill_process,
