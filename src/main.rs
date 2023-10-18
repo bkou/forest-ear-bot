@@ -29,6 +29,7 @@ use crate::commands::list_desktop::*;
 use crate::commands::list_process::*;
 use crate::commands::read_config::*;
 use crate::commands::restart_server::*;
+use crate::commands::restore_this::*;
 use crate::commands::run_desktop_shortcut::*;
 use crate::commands::screenshot::*;
 
@@ -60,7 +61,8 @@ impl EventHandler for Handler {
     list_desktop,
     run_desktop_shortcut,
     read_config,
-    backup
+    backup,
+    restore_this,
 )]
 struct General;
 

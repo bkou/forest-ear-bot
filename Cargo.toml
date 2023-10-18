@@ -15,3 +15,4 @@ system_shutdown = "4.0.1"
 tokio = { version = "1.32.0", features = ["macros", "signal", "rt-multi-thread"] }
 tracing = "0.1.23"
 tracing-subscriber = "0.2"
+zip-extract = "0.1.2"
