@@ -4,23 +4,27 @@ use serenity::framework::standard::macros::command;
 use serenity::framework::standard::{Args, CommandResult};
 use serenity::model::prelude::*;
 use serenity::prelude::*;
-use sysinfo::{ProcessExt, System, SystemExt};
 use std::env;
+use sysinfo::{ProcessExt, System, SystemExt};
 use tokio::io::AsyncWriteExt;
-
 
 #[command]
 pub async fn restore_this(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
-
-
     if let Some(reference) = &msg.message_reference {
-        let orig_message = reference.channel_id.message(&ctx.http, reference.message_id.unwrap()).await.unwrap();
+        let orig_message = reference
+            .channel_id
+            .message(&ctx.http, reference.message_id.unwrap())
+            .await
+            .unwrap();
         let text = orig_message.content;
         let _ = &msg.channel_id.say(&ctx.http, "starting").await;
 
         let attachments = orig_message.attachments;
         if attachments.len() != 1 {
-            let _ = &msg.channel_id.say(&ctx.http, "Expecting exactly one attachment").await;
+            let _ = &msg
+                .channel_id
+                .say(&ctx.http, "Expecting exactly one attachment")
+                .await;
             return Ok(());
         }
 
@@ -31,17 +35,21 @@ pub async fn restore_this(ctx: &Context, msg: &Message, mut args: Args) -> Comma
         let content = match attachment.download().await {
             Ok(content) => content,
             Err(_) => {
-                let _ =
-                   msg.channel_id.say(&ctx, "Error downloading attachment").await;
+                let _ = msg
+                    .channel_id
+                    .say(&ctx, "Error downloading attachment")
+                    .await;
 
                 return Ok(());
-            },
+            }
         };
 
         let server_num = attachment.filename.split("_").collect::<Vec<_>>()[0];
 
-        let _ = &msg.channel_id.say(&ctx.http, "downloaded zip content to var").await;
-
+        let _ = &msg
+            .channel_id
+            .say(&ctx.http, "downloaded zip content to var")
+            .await;
 
         let user_dirs = UserDirs::new().unwrap();
         let saves_dir_link = ShellLink::open(saves_dir_link).expect("couldn't open shell link");
@@ -52,7 +60,10 @@ pub async fn restore_this(ctx: &Context, msg: &Message, mut args: Args) -> Comma
         // Delete and restore new save.
         let _ = &msg.channel_id.say(&ctx.http, "starting extract").await;
         let _ = zip_extract::extract(std::io::Cursor::new(content), &saves_dir, false);
-        let _ = &msg.channel_id.say(&ctx.http, "done with extract, save should be done").await;
+        let _ = &msg
+            .channel_id
+            .say(&ctx.http, "done with extract, save should be done")
+            .await;
 
         return Ok(());
     } else {

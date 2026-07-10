@@ -8,14 +8,10 @@ use serenity::async_trait;
 use serenity::client::bridge::gateway::ShardManager;
 use serenity::framework::standard::macros::group;
 use serenity::framework::standard::macros::help;
-use serenity::framework::StandardFramework;
 use serenity::framework::standard::{
-    help_commands,
-    Args,
-    CommandGroup,
-    CommandResult,
-    HelpOptions,
+    help_commands, Args, CommandGroup, CommandResult, HelpOptions,
 };
+use serenity::framework::StandardFramework;
 use serenity::http::Http;
 use serenity::model::event::ResumedEvent;
 use serenity::model::gateway::Ready;
@@ -62,7 +58,7 @@ impl EventHandler for Handler {
     run_desktop_shortcut,
     read_config,
     backup,
-    restore_this,
+    restore_this
 )]
 struct General;
 
