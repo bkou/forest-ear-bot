@@ -11,7 +11,7 @@ use crate::commands::list_desktop::list_desktop;
 use crate::commands::list_process::list_process;
 use crate::commands::read_config::read_config;
 use crate::commands::restart_server::restart_server;
-use crate::commands::restore_this::restore_this;
+use crate::commands::restore_this::{restore_this, restore_this_menu};
 use crate::commands::run_desktop_shortcut::run_desktop_shortcut;
 use crate::commands::screenshot::screenshot;
 
@@ -58,6 +58,7 @@ async fn main() {
                 read_config(),
                 backup(),
                 restore_this(),
+                restore_this_menu(),
             ],
             prefix_options: poise::PrefixFrameworkOptions {
                 prefix: Some("!F".into()),
