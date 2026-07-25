@@ -1,11 +1,10 @@
-use serenity::framework::standard::macros::command;
-use serenity::framework::standard::{Args, CommandResult};
-use serenity::model::prelude::*;
-use serenity::prelude::*;
 use system_shutdown::reboot;
 
-#[command]
-pub async fn restart_server(_ctx: &Context, _msg: &Message, _args: Args) -> CommandResult {
+use crate::{Context, Error};
+
+/// Reboot the machine the bot runs on.
+#[poise::command(prefix_command, slash_command)]
+pub async fn restart_server(_ctx: Context<'_>) -> Result<(), Error> {
     match reboot() {
         Ok(_) => println!("Shutting down, bye!"),
         Err(error) => eprintln!("Failed to shut down: {}", error),

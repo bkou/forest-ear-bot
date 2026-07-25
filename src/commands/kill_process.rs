@@ -1,13 +1,13 @@
-use serenity::framework::standard::macros::command;
-use serenity::framework::standard::{Args, CommandResult};
-use serenity::model::prelude::*;
-use serenity::prelude::*;
 use sysinfo::{ProcessExt, System, SystemExt};
 
-#[command]
-pub async fn kill_process(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
-    let process_name = args.single::<String>()?;
+use crate::{Context, Error};
 
+/// Kill running processes whose name matches the argument.
+#[poise::command(prefix_command, slash_command)]
+pub async fn kill_process(
+    ctx: Context<'_>,
+    #[description = "Process name to kill"] process_name: String,
+) -> Result<(), Error> {
     let sys = System::new_all();
 
     let mut s = String::new();
@@ -28,9 +28,7 @@ pub async fn kill_process(ctx: &Context, msg: &Message, mut args: Args) -> Comma
         s.push_str("\n");
         process.kill();
     }
-    if let Err(why) = msg.channel_id.say(&ctx.http, &s).await {
-        println!("Error sending message: {:?}", why);
-    }
+    ctx.say(&s).await?;
     println!("{}", s);
 
     Ok(())

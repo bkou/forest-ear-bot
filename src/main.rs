@@ -1,124 +1,90 @@
 mod commands;
 
-use std::collections::HashSet;
 use std::env;
-use std::sync::Arc;
 
-use serenity::async_trait;
-use serenity::client::bridge::gateway::ShardManager;
-use serenity::framework::standard::macros::group;
-use serenity::framework::standard::macros::help;
-use serenity::framework::standard::{
-    help_commands, Args, CommandGroup, CommandResult, HelpOptions,
-};
-use serenity::framework::StandardFramework;
-use serenity::http::Http;
-use serenity::model::event::ResumedEvent;
-use serenity::model::gateway::Ready;
-use serenity::model::prelude::{Message, UserId};
-use serenity::prelude::*;
+use poise::serenity_prelude as serenity;
 use tracing::{error, info};
 
-use crate::commands::backup::*;
-use crate::commands::kill_process::*;
-use crate::commands::list_desktop::*;
-use crate::commands::list_process::*;
-use crate::commands::read_config::*;
-use crate::commands::restart_server::*;
-use crate::commands::restore_this::*;
-use crate::commands::run_desktop_shortcut::*;
-use crate::commands::screenshot::*;
+use crate::commands::backup::backup;
+use crate::commands::kill_process::kill_process;
+use crate::commands::list_desktop::list_desktop;
+use crate::commands::list_process::list_process;
+use crate::commands::read_config::read_config;
+use crate::commands::restart_server::restart_server;
+use crate::commands::restore_this::restore_this;
+use crate::commands::run_desktop_shortcut::run_desktop_shortcut;
+use crate::commands::screenshot::screenshot;
 
-pub struct ShardManagerContainer;
+/// Shared state passed to every command invocation.
+pub struct Data {}
+pub type Error = Box<dyn std::error::Error + Send + Sync>;
+pub type Context<'a> = poise::Context<'a, Data, Error>;
 
-impl TypeMapKey for ShardManagerContainer {
-    type Value = Arc<Mutex<ShardManager>>;
-}
-
-struct Handler;
-
-#[async_trait]
-impl EventHandler for Handler {
-    async fn ready(&self, _: Context, ready: Ready) {
-        info!("Connected as {}", ready.user.name);
-    }
-
-    async fn resume(&self, _: Context, _: ResumedEvent) {
-        info!("Resumed");
-    }
-}
-
-#[group]
-#[commands(
-    restart_server,
-    screenshot,
-    list_process,
-    kill_process,
-    list_desktop,
-    run_desktop_shortcut,
-    read_config,
-    backup,
-    restore_this
-)]
-struct General;
-
-#[help]
-async fn my_help(
-    context: &Context,
-    msg: &Message,
-    args: Args,
-    help_options: &'static HelpOptions,
-    groups: &[&'static CommandGroup],
-    owners: HashSet<UserId>,
-) -> CommandResult {
-    let _ = help_commands::with_embeds(context, msg, args, help_options, groups, owners).await;
+/// Show a list of commands, or detailed help for a single command.
+#[poise::command(prefix_command, slash_command)]
+pub async fn help(
+    ctx: Context<'_>,
+    #[description = "Command to show help for"] command: Option<String>,
+) -> Result<(), Error> {
+    poise::builtins::help(
+        ctx,
+        command.as_deref(),
+        poise::builtins::HelpConfiguration::default(),
+    )
+    .await?;
     Ok(())
 }
 
 #[tokio::main]
 async fn main() {
+    tracing_subscriber::fmt::init();
+
     let token = env::var("DISCORD_TOKEN").expect("Expected a token in the environment");
 
-    let http = Http::new(&token);
+    let intents = serenity::GatewayIntents::GUILD_MESSAGES
+        | serenity::GatewayIntents::DIRECT_MESSAGES
+        | serenity::GatewayIntents::MESSAGE_CONTENT;
 
-    // We will fetch your bot's owners and id
-    let (owners, _bot_id) = match http.get_current_application_info().await {
-        Ok(info) => {
-            let mut owners = HashSet::new();
-            owners.insert(info.owner.id);
+    let framework = poise::Framework::builder()
+        .options(poise::FrameworkOptions {
+            commands: vec![
+                help(),
+                restart_server(),
+                screenshot(),
+                list_process(),
+                kill_process(),
+                list_desktop(),
+                run_desktop_shortcut(),
+                read_config(),
+                backup(),
+                restore_this(),
+            ],
+            prefix_options: poise::PrefixFrameworkOptions {
+                prefix: Some("!F".into()),
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        .setup(|ctx, ready, framework| {
+            Box::pin(async move {
+                poise::builtins::register_globally(ctx, &framework.options().commands).await?;
+                info!("Connected as {}", ready.user.name);
+                Ok(Data {})
+            })
+        })
+        .build();
 
-            (owners, info.id)
-        }
-        Err(why) => panic!("Could not access application info: {:?}", why),
-    };
-
-    // Create the framework
-    let framework = StandardFramework::new()
-        .configure(|c| c.owners(owners).prefix("!F"))
-        .group(&GENERAL_GROUP)
-        .help(&MY_HELP);
-
-    let intents = GatewayIntents::GUILD_MESSAGES
-        | GatewayIntents::DIRECT_MESSAGES
-        | GatewayIntents::MESSAGE_CONTENT;
-    let mut client = Client::builder(&token, intents)
+    let mut client = serenity::ClientBuilder::new(&token, intents)
         .framework(framework)
-        .event_handler(Handler)
         .await
         .expect("Err creating client");
 
-    {
-        let mut data = client.data.write().await;
-        data.insert::<ShardManagerContainer>(client.shard_manager.clone());
-    }
-
     let shard_manager = client.shard_manager.clone();
-
     tokio::spawn(async move {
         tokio::signal::ctrl_c()
             .await
             .expect("Could not register ctrl+c handler");
-        shard_manager.lock().await.shutdown_all().await;
+        shard_manager.shutdown_all().await;
     });
 
     if let Err(why) = client.start().await {

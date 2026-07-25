@@ -1,12 +1,11 @@
 use directories::UserDirs;
-use serenity::framework::standard::macros::command;
-use serenity::framework::standard::{Args, CommandResult};
-use serenity::model::prelude::*;
-use serenity::prelude::*;
 use std::fs;
 
-#[command]
-pub async fn list_desktop(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
+use crate::{Context, Error};
+
+/// List the files on the desktop.
+#[poise::command(prefix_command, slash_command)]
+pub async fn list_desktop(ctx: Context<'_>) -> Result<(), Error> {
     if let Some(user_dirs) = UserDirs::new() {
         let paths = fs::read_dir(user_dirs.desktop_dir().unwrap().as_os_str()).unwrap();
 
@@ -17,9 +16,7 @@ pub async fn list_desktop(ctx: &Context, msg: &Message, _args: Args) -> CommandR
         }
         s.push_str("\n");
         s.push_str("Run the run_desktop_shortcut with just the filename (no directory) as arg.");
-        if let Err(why) = msg.channel_id.say(&ctx.http, &s).await {
-            println!("Error sending message: {:?}", why);
-        }
+        ctx.say(&s).await?;
     }
 
     Ok(())

@@ -1,15 +1,16 @@
 use directories::UserDirs;
 use lnk::ShellLink;
-use serenity::framework::standard::macros::command;
-use serenity::framework::standard::{Args, CommandResult};
-use serenity::model::prelude::*;
-use serenity::prelude::*;
 use std::process::Command;
 
-#[command]
-pub async fn run_desktop_shortcut(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+use crate::{Context, Error};
+
+/// Run a desktop shortcut (.lnk) by filename.
+#[poise::command(prefix_command, slash_command)]
+pub async fn run_desktop_shortcut(
+    ctx: Context<'_>,
+    #[description = "Shortcut filename on the desktop (no directory)"] filename: String,
+) -> Result<(), Error> {
     if let Some(user_dirs) = UserDirs::new() {
-        let filename = args.single::<String>()?;
         let path = user_dirs.desktop_dir().unwrap().join(&filename);
 
         let deref = ShellLink::open(path).unwrap();
@@ -17,13 +18,7 @@ pub async fn run_desktop_shortcut(ctx: &Context, msg: &Message, mut args: Args) 
             .spawn()
             .expect("command failed to start");
 
-        if let Err(why) = msg
-            .channel_id
-            .say(&ctx.http, format!("Started {}", filename))
-            .await
-        {
-            println!("Error sending message: {:?}", why);
-        }
+        ctx.say(format!("Started {}", filename)).await?;
     }
 
     Ok(())

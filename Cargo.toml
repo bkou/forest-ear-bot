@@ -8,8 +8,8 @@ edition = "2021"
 [dependencies]
 directories = "5.0.1"
 lnk = "0.5.1"
+poise = { version = "0.6", features = ["cache"] }
 screenshots = "0.8.2"
-serenity = { version = "0.11.6", default-features = false, features = ["cache", "client", "framework", "gateway", "standard_framework", "rustls_backend"] }
 sysinfo = "0.29.8"
 system_shutdown = "4.0.1"
 tokio = { version = "1.32.0", features = ["macros", "signal", "rt-multi-thread"] }
