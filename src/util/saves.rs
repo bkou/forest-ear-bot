@@ -225,6 +225,19 @@ fn filename_stamp() -> String {
     chrono::Local::now().format("%Y%m%d-%H%M%S").to_string()
 }
 
+/// Discord rejects embed field values longer than this.
+const MAX_FIELD: usize = 1024;
+
+/// Clip a field value to Discord's limit — an over-long one would make the
+/// entire message fail to send, losing the backup with it.
+fn truncate_field(text: &str) -> String {
+    if text.chars().count() <= MAX_FIELD {
+        return text.to_string();
+    }
+    // Count in chars, not bytes, so this can't split a multi-byte character.
+    text.chars().take(MAX_FIELD - 1).chain(['…']).collect()
+}
+
 /// Zip `dir` and post it as a backup message carrying `path` for later restore.
 ///
 /// Both `/backup` and the pre-restore safety copy go through here, so every
@@ -234,6 +247,7 @@ pub async fn post_backup(
     path: &str,
     resolved_path: &Path,
     title: &str,
+    description: Option<&str>,
 ) -> Result<(), Error> {
     let dir_owned = resolved_path.to_path_buf();
     let bytes = tokio::task::spawn_blocking(move || zip_dir(&dir_owned)).await??;
@@ -241,12 +255,16 @@ pub async fn post_backup(
 
     let filename = format!("{}_{}.zip", sanitize(path), filename_stamp());
 
-    let embed = serenity::CreateEmbed::new()
+    let mut embed = serenity::CreateEmbed::new()
         .title(format!("{}: {}", title, path))
         .field("path", path, false)
         .field("size", format!("{:.2} MB", size_mb), true)
         .footer(serenity::CreateEmbedFooter::new(BACKUP_MARKER))
         .timestamp(serenity::Timestamp::now());
+
+    if let Some(description) = description.map(str::trim).filter(|d| !d.is_empty()) {
+        embed = embed.field("description", truncate_field(description), false);
+    }
 
     // No size pre-check — just attempt the upload and let Discord decide. A
     // rejection here surfaces as an error, which for restore means aborting

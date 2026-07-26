@@ -39,7 +39,14 @@ async fn restore_from_message(ctx: Context<'_>, source: &serenity::Message) -> R
         ctx.say(format!("`{}` is empty, nothing to save first.", path))
             .await?;
     } else {
-        saves::post_backup(ctx, &path, &dir, "Pre-restore backup").await?;
+        saves::post_backup(
+            ctx,
+            &path,
+            &dir,
+            "Pre-restore backup",
+            Some("Automatic snapshot of the folder as it was just before a restore. Restore this message to undo."),
+        )
+        .await?;
     }
 
     let target = dir.clone();
