@@ -114,34 +114,19 @@ pub fn resolve_lnk(path: &Path) -> Result<PathBuf, Error> {
 
 /// The actual parse. Only ever called through [`resolve_lnk`], which contains
 /// panics from the underlying crate.
-///
-/// The target fields are tried most- to least-reliable; the unicode base path is
-/// usually present and absolute, while `relative_path` often is not.
 fn read_lnk(path: &Path) -> Result<PathBuf, Error> {
-    let link = ShellLink::open(path)
+    // The codepage is only consulted for shortcuts storing non-Unicode strings;
+    // Unicode ones ignore it. WINDOWS_1252 is the usual Western default.
+    let link = ShellLink::open(path, lnk::encoding::WINDOWS_1252)
         .map_err(|e| format!("Could not read shortcut {}: {:?}", path.display(), e))?;
 
+    // Builds the full target from the LinkInfo structure, handling local and
+    // network paths and appending the common path suffix.
     let target = link
-        .link_info()
-        .as_ref()
-        .and_then(|i| i.local_base_path_unicode().clone())
-        .or_else(|| {
-            link.link_info()
-                .as_ref()
-                .and_then(|i| i.local_base_path().clone())
-        })
-        .or_else(|| link.relative_path().clone())
-        .or_else(|| link.working_dir().clone())
+        .link_target()
         .ok_or_else(|| format!("Shortcut {} has no resolvable target path", path.display()))?;
 
     let target = PathBuf::from(target);
-    // A relative_path fallback is relative to the shortcut's own folder.
-    let target = if target.is_relative() {
-        path.parent().unwrap_or(Path::new(".")).join(target)
-    } else {
-        target
-    };
-
     std::fs::canonicalize(&target)
         .map_err(|e| format!("Shortcut target {} is unreachable: {}", target.display(), e).into())
 }

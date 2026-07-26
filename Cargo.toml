@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 chrono = "0.4"
 directories = "5.0.1"
-lnk = "0.5.1"
+lnk = "0.6"
 poise = { version = "0.6", features = ["cache"] }
 screenshots = "0.8.2"
 sysinfo = "0.29.8"

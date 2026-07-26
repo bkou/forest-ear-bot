@@ -1,7 +1,7 @@
 use directories::UserDirs;
-use lnk::ShellLink;
 use std::process::Command;
 
+use crate::util::saves;
 use crate::{Context, Error};
 
 /// Run a desktop shortcut (.lnk) by filename.
@@ -13,8 +13,8 @@ pub async fn run_desktop_shortcut(
     if let Some(user_dirs) = UserDirs::new() {
         let path = user_dirs.desktop_dir().unwrap().join(&filename);
 
-        let deref = ShellLink::open(path).unwrap();
-        Command::new(deref.relative_path().clone().unwrap())
+        let target = saves::resolve_lnk(&path)?;
+        Command::new(&target)
             .spawn()
             .expect("command failed to start");
 

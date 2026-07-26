@@ -1,7 +1,7 @@
 use directories::UserDirs;
-use lnk::ShellLink;
 use std::fs;
 
+use crate::util::saves;
 use crate::{Context, Error};
 
 /// Read and post the dedicated server config file.
@@ -13,14 +13,14 @@ pub async fn read_config(ctx: Context<'_>) -> Result<(), Error> {
             .unwrap()
             .join("dedicatedserver.cfg.lnk");
 
-        let deref = match ShellLink::open(path) {
-            Err(_) => {
-                ctx.say("File not found.").await?;
+        let target = match saves::resolve_lnk(&path) {
+            Err(why) => {
+                ctx.say(format!("File not found: {}", why)).await?;
                 return Err(Error::from("File not found."));
             }
-            Ok(f) => f,
+            Ok(target) => target,
         };
-        let contents = fs::read_to_string(deref.relative_path().as_ref().unwrap())?;
+        let contents = fs::read_to_string(&target)?;
 
         ctx.say("File contents: ").await?;
         ctx.say(contents).await?;
