@@ -1,11 +1,11 @@
 use crate::util::saves;
 use crate::{Context, Error};
 
-/// Zip a save folder and post it, e.g. `Palworld_Server/Saved`.
+/// Post a save folder (zipped) or a single file (as-is).
 #[poise::command(prefix_command, slash_command)]
 pub async fn backup(
     ctx: Context<'_>,
-    #[description = "Save folder to back up, e.g. Palworld_Server/Saved"] path: String,
+    #[description = "Folder or file to back up, e.g. Palworld_Server/Saved"] path: String,
     // `rest` so a prefix invocation takes the whole remaining message instead of
     // stopping at the first space.
     #[description = "Optional note to tag this backup with"]

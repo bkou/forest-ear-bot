@@ -131,7 +131,7 @@ fn read_lnk(path: &Path) -> Result<PathBuf, Error> {
         .map_err(|e| format!("Shortcut target {} is unreachable: {}", target.display(), e).into())
 }
 
-/// Resolve a user-facing path (`entry/sub/folder`) to an absolute directory.
+/// Resolve a user-facing path (`entry/sub/name`) to an absolute folder or file.
 ///
 /// Walks it one segment at a time from the saves root, so the root entry and
 /// everything below it are treated identically — a shortcut is followed at
@@ -154,11 +154,34 @@ pub fn resolve(path: &str) -> Result<PathBuf, Error> {
         current = step(&current, segment)?;
     }
 
-    if !current.is_dir() {
-        return Err(format!("`{}` is a file, not a folder", path).into());
+    Ok(current)
+}
+
+/// What a backup message holds: a zipped folder, or one file as-is.
+///
+/// Restore can't tell these apart from the attachment — a backed-up file may
+/// itself be a `.zip` — so the kind is recorded in the message.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Kind {
+    Folder,
+    File,
+}
+
+impl Kind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Kind::Folder => "folder",
+            Kind::File => "file",
+        }
     }
 
-    Ok(current)
+    pub fn of(resolved_path: &Path) -> Self {
+        if resolved_path.is_dir() {
+            Kind::Folder
+        } else {
+            Kind::File
+        }
+    }
 }
 
 /// Recursively zip a directory's contents into an in-memory archive.
@@ -238,7 +261,10 @@ fn truncate_field(text: &str) -> String {
     text.chars().take(MAX_FIELD - 1).chain(['…']).collect()
 }
 
-/// Zip `dir` and post it as a backup message carrying `path` for later restore.
+/// Post `resolved_path` as a backup message carrying `path` for later restore.
+///
+/// A folder is zipped; a single file is attached as-is, so it stays readable in
+/// Discord without an unzip step.
 ///
 /// Both `/backup` and the pre-restore safety copy go through here, so every
 /// backup message has the same shape and any of them can be restored.
@@ -249,15 +275,37 @@ pub async fn post_backup(
     title: &str,
     description: Option<&str>,
 ) -> Result<(), Error> {
-    let dir_owned = resolved_path.to_path_buf();
-    let bytes = tokio::task::spawn_blocking(move || zip_dir(&dir_owned)).await??;
-    let size_mb = bytes.len() as f64 / 1_048_576.0;
+    let kind = Kind::of(resolved_path);
+    let owned = resolved_path.to_path_buf();
 
-    let filename = format!("{}_{}.zip", sanitize(path), filename_stamp());
+    let (bytes, filename) = match kind {
+        Kind::Folder => (
+            tokio::task::spawn_blocking(move || zip_dir(&owned)).await??,
+            format!("{}_{}.zip", sanitize(path), filename_stamp()),
+        ),
+        Kind::File => {
+            // Keep the real extension last so Discord previews it correctly.
+            let stem = owned
+                .file_stem()
+                .map(|s| s.to_string_lossy().to_string())
+                .unwrap_or_else(|| sanitize(path));
+            let ext = owned
+                .extension()
+                .map(|e| format!(".{}", e.to_string_lossy()))
+                .unwrap_or_default();
+            (
+                tokio::task::spawn_blocking(move || std::fs::read(&owned)).await??,
+                format!("{}_{}{}", stem, filename_stamp(), ext),
+            )
+        }
+    };
+
+    let size_mb = bytes.len() as f64 / 1_048_576.0;
 
     let mut embed = serenity::CreateEmbed::new()
         .title(format!("{}: {}", title, path))
         .field("path", path, false)
+        .field("kind", kind.as_str(), true)
         .field("size", format!("{:.2} MB", size_mb), true)
         .footer(serenity::CreateEmbedFooter::new(BACKUP_MARKER))
         .timestamp(serenity::Timestamp::now());
@@ -285,6 +333,20 @@ pub async fn post_backup(
 /// Returns `None` unless the message carries this bot's marker, so restore can
 /// refuse messages that merely happen to have a zip attached.
 pub fn parse_backup_path(message: &serenity::Message) -> Option<String> {
+    backup_field(message, "path")
+}
+
+/// What the backup holds. Messages posted before file support carry no `kind`
+/// field, and those were all zipped folders — so that's the default.
+pub fn parse_backup_kind(message: &serenity::Message) -> Kind {
+    match backup_field(message, "kind").as_deref() {
+        Some("file") => Kind::File,
+        _ => Kind::Folder,
+    }
+}
+
+/// Read one field from a message bearing this bot's backup marker.
+fn backup_field(message: &serenity::Message, name: &str) -> Option<String> {
     message.embeds.iter().find_map(|embed| {
         let marked = embed
             .footer
@@ -296,7 +358,7 @@ pub fn parse_backup_path(message: &serenity::Message) -> Option<String> {
         embed
             .fields
             .iter()
-            .find(|f| f.name == "path")
+            .find(|f| f.name == name)
             .map(|f| f.value.clone())
     })
 }
@@ -469,6 +531,18 @@ mod tests {
 
         let err = saves_root().unwrap_err().to_string();
         assert!(err.contains("not a folder"), "unexpected error: {}", err);
+    }
+
+    #[test]
+    fn resolves_a_file_and_reports_its_kind() {
+        let (_tmp, _guard) = fixture();
+
+        let file = resolve("Palworld_Server/Saved/level.sav").unwrap();
+        assert!(file.is_file());
+        assert_eq!(Kind::of(&file), Kind::File);
+
+        let dir = resolve("Palworld_Server/Saved").unwrap();
+        assert_eq!(Kind::of(&dir), Kind::Folder);
     }
 
     #[test]

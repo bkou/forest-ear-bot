@@ -112,7 +112,10 @@ pub async fn list_saves(
 
     let mut body = render_listing(&header, &collect_rows(&dir)?);
     body.push_str(&match path {
-        Some(path) => format!("\nBack this folder up with `/backup {}`.", path),
+        Some(path) => format!(
+            "\nBack this up with `/backup {}`, or a single file with `/backup {}/<file>`.",
+            path, path
+        ),
         None => "\nList a folder with `/list_saves <entry>/<subfolder>`.".to_string(),
     });
 

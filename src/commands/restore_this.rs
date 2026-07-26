@@ -3,12 +3,13 @@ use poise::serenity_prelude as serenity;
 use crate::util::saves;
 use crate::{Context, Error};
 
-/// Replace a save folder with the zip attached to a backup message.
+/// Replace a save folder or file from the attachment on a backup message.
 ///
-/// The destination comes from the message itself rather than an argument, which
-/// is what lets this work as a context menu action (those take no parameters).
+/// The destination and kind come from the message itself rather than arguments,
+/// which is what lets this work as a context menu action (those take no
+/// parameters).
 ///
-/// The current contents are zipped and posted *before* anything is deleted, so a
+/// The current contents are posted *before* anything is overwritten, so a
 /// failure at any point leaves the filesystem untouched and every restore can be
 /// undone from the message it posts.
 async fn restore_from_message(ctx: Context<'_>, source: &serenity::Message) -> Result<(), Error> {
@@ -19,6 +20,7 @@ async fn restore_from_message(ctx: Context<'_>, source: &serenity::Message) -> R
             .await?;
         return Ok(());
     };
+    let kind = saves::parse_backup_kind(source);
 
     let attachments = &source.attachments;
     if attachments.len() != 1 {
@@ -27,7 +29,20 @@ async fn restore_from_message(ctx: Context<'_>, source: &serenity::Message) -> R
     }
     let attachment = &attachments[0];
 
-    let dir = saves::resolve(&path)?;
+    let target = saves::resolve(&path)?;
+
+    // The backup and the destination must agree, or we'd unzip over a file or
+    // write an archive where a folder belongs.
+    if saves::Kind::of(&target) != kind {
+        ctx.say(format!(
+            "`{}` is now a {}, but that backup holds a {}. Refusing to restore.",
+            path,
+            saves::Kind::of(&target).as_str(),
+            kind.as_str()
+        ))
+        .await?;
+        return Ok(());
+    }
 
     let content = attachment
         .download()
@@ -35,25 +50,33 @@ async fn restore_from_message(ctx: Context<'_>, source: &serenity::Message) -> R
         .map_err(|e| format!("Error downloading attachment: {}", e))?;
 
     // Safety copy first — if this upload fails, we abort having destroyed nothing.
-    if saves::is_empty(&dir)? {
+    if kind == saves::Kind::Folder && saves::is_empty(&target)? {
         ctx.say(format!("`{}` is empty, nothing to save first.", path))
             .await?;
     } else {
         saves::post_backup(
             ctx,
             &path,
-            &dir,
+            &target,
             "Pre-restore backup",
-            Some("Automatic snapshot of the folder as it was just before a restore. Restore this message to undo."),
+            Some("Automatic snapshot taken just before a restore. Restore this message to undo."),
         )
         .await?;
     }
 
-    let target = dir.clone();
+    let dest = target.clone();
     tokio::task::spawn_blocking(move || -> Result<(), String> {
-        saves::wipe_dir(&target).map_err(|e| format!("{}", e))?;
-        zip_extract::extract(std::io::Cursor::new(content), &target, false)
-            .map_err(|e| format!("{}", e))?;
+        match kind {
+            // Wipe first so files the backup doesn't contain don't survive.
+            saves::Kind::Folder => {
+                saves::wipe_dir(&dest).map_err(|e| format!("{}", e))?;
+                zip_extract::extract(std::io::Cursor::new(content), &dest, false)
+                    .map_err(|e| format!("{}", e))?;
+            }
+            saves::Kind::File => {
+                std::fs::write(&dest, content).map_err(|e| format!("{}", e))?;
+            }
+        }
         Ok(())
     })
     .await??;
