@@ -1,45 +1,57 @@
-use directories::UserDirs;
-use lnk::ShellLink;
 use poise::serenity_prelude as serenity;
 
+use crate::util::saves;
 use crate::{Context, Error};
 
-/// Download the single zip attached to `source` and extract it into the saves folder.
+/// Replace a save folder with the zip attached to a backup message.
 ///
-/// Shared by both entry points: the reply-based prefix command and the message
-/// context menu action.
+/// The destination comes from the message itself rather than an argument, which
+/// is what lets this work as a context menu action (those take no parameters).
+///
+/// The current contents are zipped and posted *before* anything is deleted, so a
+/// failure at any point leaves the filesystem untouched and every restore can be
+/// undone from the message it posts.
 async fn restore_from_message(ctx: Context<'_>, source: &serenity::Message) -> Result<(), Error> {
+    ctx.defer().await?;
+
+    let Some(path) = saves::parse_backup_path(source) else {
+        ctx.say("That isn't a backup message from this bot — restore only works on messages `/backup` posted.")
+            .await?;
+        return Ok(());
+    };
+
     let attachments = &source.attachments;
     if attachments.len() != 1 {
         ctx.say("Expecting exactly one attachment").await?;
         return Ok(());
     }
-
     let attachment = &attachments[0];
 
-    let content = match attachment.download().await {
-        Ok(content) => content,
-        Err(_) => {
-            ctx.say("Error downloading attachment").await?;
-            return Ok(());
-        }
-    };
+    let dir = saves::resolve(&path)?;
 
-    // The filename is prefixed with the server number (e.g. "1_save.zip"); the
-    // original intent was to extract into a per-server subfolder, never finished.
-    ctx.say("downloaded zip content to var").await?;
+    let content = attachment
+        .download()
+        .await
+        .map_err(|e| format!("Error downloading attachment: {}", e))?;
 
-    let user_dirs = UserDirs::new().unwrap();
-    let saves_dir_link_path = user_dirs.desktop_dir().unwrap().join("forest_saves.lnk");
-    let saves_dir_link = ShellLink::open(saves_dir_link_path).expect("couldn't open shell link");
-    let saves_dir_string = saves_dir_link.relative_path().as_ref().unwrap().clone();
-    let saves_dir = std::path::Path::new(&saves_dir_string);
+    // Safety copy first — if this upload fails, we abort having destroyed nothing.
+    if saves::is_empty(&dir)? {
+        ctx.say(format!("`{}` is empty, nothing to save first.", path))
+            .await?;
+    } else {
+        saves::post_backup(ctx, &path, &dir, "Pre-restore backup").await?;
+    }
 
-    // Delete and restore new save.
-    ctx.say("starting extract").await?;
-    let _ = zip_extract::extract(std::io::Cursor::new(content), saves_dir, false);
-    ctx.say("done with extract, save should be done").await?;
+    let target = dir.clone();
+    tokio::task::spawn_blocking(move || -> Result<(), String> {
+        saves::wipe_dir(&target).map_err(|e| format!("{}", e))?;
+        zip_extract::extract(std::io::Cursor::new(content), &target, false)
+            .map_err(|e| format!("{}", e))?;
+        Ok(())
+    })
+    .await??;
 
+    ctx.say(format!("Restored `{}`.", path)).await?;
     Ok(())
 }
 
@@ -65,13 +77,11 @@ pub async fn restore_this(ctx: Context<'_>) -> Result<(), Error> {
         .message(ctx.http(), reference.message_id.unwrap())
         .await?;
 
-    ctx.say("starting").await?;
     restore_from_message(ctx, &orig_message).await
 }
 
 /// Restore the save zip attached to the right-clicked message.
 #[poise::command(context_menu_command = "Restore this save")]
 pub async fn restore_this_menu(ctx: Context<'_>, message: serenity::Message) -> Result<(), Error> {
-    ctx.say("starting").await?;
     restore_from_message(ctx, &message).await
 }

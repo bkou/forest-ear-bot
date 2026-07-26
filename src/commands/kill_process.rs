@@ -25,7 +25,7 @@ pub async fn kill_process(
             process.name(),
             process.disk_usage()
         ));
-        s.push_str("\n");
+        s.push('\n');
         process.kill();
     }
     ctx.say(&s).await?;

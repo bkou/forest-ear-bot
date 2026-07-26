@@ -25,7 +25,7 @@ pub async fn list_process(
             process.name(),
             process.disk_usage()
         ));
-        s.push_str("\n");
+        s.push('\n');
     }
     ctx.say(&s).await?;
     println!("{}", s);

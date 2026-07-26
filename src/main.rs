@@ -1,4 +1,5 @@
 mod commands;
+mod util;
 
 use std::env;
 
@@ -9,6 +10,7 @@ use crate::commands::backup::backup;
 use crate::commands::kill_process::kill_process;
 use crate::commands::list_desktop::list_desktop;
 use crate::commands::list_process::list_process;
+use crate::commands::list_saves::list_saves;
 use crate::commands::read_config::read_config;
 use crate::commands::restart_server::restart_server;
 use crate::commands::restore_this::{restore_this, restore_this_menu};
@@ -54,6 +56,7 @@ async fn main() {
                 list_process(),
                 kill_process(),
                 list_desktop(),
+                list_saves(),
                 run_desktop_shortcut(),
                 read_config(),
                 backup(),

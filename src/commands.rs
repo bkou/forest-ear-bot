@@ -2,6 +2,7 @@ pub mod backup;
 pub mod kill_process;
 pub mod list_desktop;
 pub mod list_process;
+pub mod list_saves;
 pub mod read_config;
 pub mod restart_server;
 pub mod restore_this;

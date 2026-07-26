@@ -20,7 +20,7 @@ pub async fn read_config(ctx: Context<'_>) -> Result<(), Error> {
             }
             Ok(f) => f,
         };
-        let contents = fs::read_to_string(&deref.relative_path().as_ref().unwrap())?;
+        let contents = fs::read_to_string(deref.relative_path().as_ref().unwrap())?;
 
         ctx.say("File contents: ").await?;
         ctx.say(contents).await?;
