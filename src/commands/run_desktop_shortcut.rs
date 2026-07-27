@@ -14,9 +14,16 @@ pub async fn run_desktop_shortcut(
         let path = user_dirs.desktop_dir().unwrap().join(&filename);
 
         let target = saves::resolve_lnk(&path)?;
-        Command::new(&target)
+
+        // Detaching is the point — these are games and servers meant to outlive
+        // the command. Waiting would block until the user quits the program.
+        // Clippy warns because an unreaped child becomes a zombie on Unix; on
+        // Windows, the only platform where `.lnk` resolution works, dropping the
+        // handle is a complete cleanup.
+        #[allow(clippy::zombie_processes)]
+        let _child = Command::new(&target)
             .spawn()
-            .expect("command failed to start");
+            .map_err(|e| format!("Could not start {}: {}", target.display(), e))?;
 
         ctx.say(format!("Started {}", filename)).await?;
     }
