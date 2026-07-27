@@ -18,6 +18,7 @@ use crate::commands::restore_this::{restore_this, restore_this_menu};
 use crate::commands::run_desktop_shortcut::run_desktop_shortcut;
 use crate::commands::screenshot::screenshot;
 use crate::commands::undelete::{undelete, undelete_menu};
+use crate::commands::version::version;
 
 /// Shared state passed to every command invocation.
 pub struct Data {}
@@ -67,6 +68,7 @@ async fn main() {
                 delete(),
                 undelete(),
                 undelete_menu(),
+                version(),
             ],
             prefix_options: poise::PrefixFrameworkOptions {
                 prefix: Some("!F".into()),
@@ -77,7 +79,11 @@ async fn main() {
         .setup(|ctx, ready, framework| {
             Box::pin(async move {
                 poise::builtins::register_globally(ctx, &framework.options().commands).await?;
-                info!("Connected as {}", ready.user.name);
+                info!(
+                    "Connected as {} (build {})",
+                    ready.user.name,
+                    env!("GIT_HASH")
+                );
                 Ok(Data {})
             })
         })

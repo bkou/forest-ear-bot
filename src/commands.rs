@@ -10,3 +10,4 @@ pub mod restore_this;
 pub mod run_desktop_shortcut;
 pub mod screenshot;
 pub mod undelete;
+pub mod version;
