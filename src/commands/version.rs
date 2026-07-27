@@ -5,7 +5,7 @@ use crate::{Context, Error};
 pub async fn version(ctx: Context<'_>) -> Result<(), Error> {
     // Baked in at compile time by build.rs.
     ctx.say(format!(
-        "{} v{} — built from `{}`",
+        "{} v{} — built from `{}`\nCommit history: <https://github.com/bkou/forest-ear-bot/commits/main/>",
         env!("CARGO_PKG_NAME"),
         env!("CARGO_PKG_VERSION"),
         env!("GIT_HASH"),
