@@ -7,6 +7,7 @@ use poise::serenity_prelude as serenity;
 use tracing::{error, info};
 
 use crate::commands::backup::backup;
+use crate::commands::delete::delete;
 use crate::commands::kill_process::kill_process;
 use crate::commands::list_desktop::list_desktop;
 use crate::commands::list_process::list_process;
@@ -16,6 +17,7 @@ use crate::commands::restart_server::restart_server;
 use crate::commands::restore_this::{restore_this, restore_this_menu};
 use crate::commands::run_desktop_shortcut::run_desktop_shortcut;
 use crate::commands::screenshot::screenshot;
+use crate::commands::undelete::{undelete, undelete_menu};
 
 /// Shared state passed to every command invocation.
 pub struct Data {}
@@ -62,6 +64,9 @@ async fn main() {
                 backup(),
                 restore_this(),
                 restore_this_menu(),
+                delete(),
+                undelete(),
+                undelete_menu(),
             ],
             prefix_options: poise::PrefixFrameworkOptions {
                 prefix: Some("!F".into()),

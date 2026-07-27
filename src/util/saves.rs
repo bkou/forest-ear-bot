@@ -52,19 +52,22 @@ pub fn saves_root() -> Result<PathBuf, Error> {
 /// A segment may name a real folder, a symlink, or a `.lnk` shortcut (with or
 /// without the extension). Because every level goes through here, shortcuts are
 /// followed wherever they appear, not just at the saves root.
-fn step(dir: &Path, segment: &str) -> Result<PathBuf, Error> {
-    // Only plain names — no `..`, no absolute paths, no embedded separators.
+/// Accept a segment only if it is exactly one plain name — no `..`, no absolute
+/// path, no embedded separator. This is what stops a path escaping its entry.
+fn plain_component(segment: &str) -> Result<&std::ffi::OsStr, Error> {
     let mut parts = Path::new(segment).components();
-    let part = match (parts.next(), parts.next()) {
-        (Some(Component::Normal(part)), None) => part,
-        _ => {
-            return Err(format!(
-                "`{}` is not allowed in a path — only plain folder names are.",
-                segment
-            )
-            .into())
-        }
-    };
+    match (parts.next(), parts.next()) {
+        (Some(Component::Normal(part)), None) => Ok(part),
+        _ => Err(format!(
+            "`{}` is not allowed in a path — only plain folder names are.",
+            segment
+        )
+        .into()),
+    }
+}
+
+fn step(dir: &Path, segment: &str) -> Result<PathBuf, Error> {
+    let part = plain_component(segment)?;
 
     let direct = dir.join(part);
     if direct.exists() {
@@ -155,6 +158,66 @@ pub fn resolve(path: &str) -> Result<PathBuf, Error> {
     }
 
     Ok(current)
+}
+
+/// Resolve a path whose *final* segment need not exist yet.
+///
+/// Everything up to the last name is walked exactly as [`resolve`] does, so the
+/// same containment rules apply; only the leaf is allowed to be missing. This is
+/// what `/undelete` needs, since its whole purpose is to recreate something that
+/// isn't there.
+pub fn resolve_new(path: &str) -> Result<PathBuf, Error> {
+    let path = path.trim().trim_matches('/').replace('\\', "/");
+    if path.is_empty() {
+        return Err("Empty path. Try something like `Palworld_Server/Saved`.".into());
+    }
+
+    let mut segments: Vec<&str> = path.split('/').collect();
+    // `split` always yields at least one element, so this cannot fail.
+    let leaf = segments.pop().unwrap();
+
+    let mut current = saves_root()?;
+    for segment in segments {
+        if segment.is_empty() {
+            return Err(format!("`{}` has an empty path segment", path).into());
+        }
+        current = step(&current, segment)?;
+    }
+
+    Ok(current.join(plain_component(leaf)?))
+}
+
+/// True if the *last* segment of `path` is reached by following a shortcut.
+///
+/// Deleting such a path would destroy the folder the shortcut points at — a
+/// whole game directory — rather than the shortcut itself. Shortcuts earlier in
+/// the path are just navigation and don't count.
+pub fn leaf_is_shortcut(path: &str) -> Result<bool, Error> {
+    // The literal leaf: parent resolved, last name joined without resolving it.
+    let literal = resolve_new(path)?;
+
+    if literal.exists() {
+        // `step` prefers a real entry over a same-named `.lnk`, so only a leaf
+        // that is itself a shortcut file counts here.
+        return Ok(is_lnk(&literal));
+    }
+
+    // Otherwise `step` would have fallen back to `<name>.lnk`.
+    let Some(name) = literal.file_name() else {
+        return Ok(false);
+    };
+    let with_lnk = literal.with_file_name(format!("{}.lnk", name.to_string_lossy()));
+    Ok(with_lnk.exists())
+}
+
+/// Delete a file, or a folder and everything inside it.
+pub fn delete_path(target: &Path) -> Result<(), Error> {
+    if target.is_dir() {
+        std::fs::remove_dir_all(target)?;
+    } else {
+        std::fs::remove_file(target)?;
+    }
+    Ok(())
 }
 
 /// What a backup message holds: a zipped folder, or one file as-is.
@@ -543,6 +606,16 @@ mod tests {
 
         let dir = resolve("Palworld_Server/Saved").unwrap();
         assert_eq!(Kind::of(&dir), Kind::Folder);
+    }
+
+    #[test]
+    fn detects_a_shortcut_leaf() {
+        let (tmp, _guard) = fixture();
+        std::fs::write(tmp.path().join("Linked.lnk"), b"x").unwrap();
+
+        assert!(leaf_is_shortcut("Linked").unwrap());
+        assert!(!leaf_is_shortcut("Palworld_Server").unwrap());
+        assert!(!leaf_is_shortcut("Palworld_Server/Saved").unwrap());
     }
 
     #[test]

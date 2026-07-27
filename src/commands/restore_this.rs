@@ -64,17 +64,17 @@ async fn restore_from_message(ctx: Context<'_>, source: &serenity::Message) -> R
         .await?;
     }
 
-    let dest = target.clone();
     tokio::task::spawn_blocking(move || -> Result<(), String> {
         match kind {
             // Wipe first so files the backup doesn't contain don't survive.
             saves::Kind::Folder => {
-                saves::wipe_dir(&dest).map_err(|e| format!("{}", e))?;
-                zip_extract::extract(std::io::Cursor::new(content), &dest, false)
+                saves::wipe_dir(&target).map_err(|e| format!("{}", e))?;
+                zip_extract::extract(std::io::Cursor::new(content), &target, false)
                     .map_err(|e| format!("{}", e))?;
             }
+            // Overwrite just this file — never touch its neighbours.
             saves::Kind::File => {
-                std::fs::write(&dest, content).map_err(|e| format!("{}", e))?;
+                std::fs::write(&target, content).map_err(|e| format!("{}", e))?;
             }
         }
         Ok(())

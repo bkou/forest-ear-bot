@@ -1,4 +1,5 @@
 pub mod backup;
+pub mod delete;
 pub mod kill_process;
 pub mod list_desktop;
 pub mod list_process;
@@ -8,3 +9,4 @@ pub mod restart_server;
 pub mod restore_this;
 pub mod run_desktop_shortcut;
 pub mod screenshot;
+pub mod undelete;
