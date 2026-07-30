@@ -13,7 +13,7 @@ poise = { version = "0.6", features = ["cache"] }
 screenshots = "0.8.2"
 sysinfo = "0.29.8"
 system_shutdown = "4.0.1"
-tokio = { version = "1.32.0", features = ["macros", "signal", "rt-multi-thread"] }
+tokio = { version = "1.32.0", features = ["macros", "process", "rt-multi-thread", "signal", "time"] }
 tracing = "0.1.23"
 tracing-subscriber = "0.2"
 zip = "0.6"

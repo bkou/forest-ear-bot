@@ -18,6 +18,7 @@ use crate::commands::restore_this::{restore_this, restore_this_menu};
 use crate::commands::run_desktop_shortcut::run_desktop_shortcut;
 use crate::commands::screenshot::screenshot;
 use crate::commands::undelete::{undelete, undelete_menu};
+use crate::commands::update::update;
 use crate::commands::version::version;
 
 /// Shared state passed to every command invocation.
@@ -68,6 +69,7 @@ async fn main() {
                 delete(),
                 undelete(),
                 undelete_menu(),
+                update(),
                 version(),
             ],
             prefix_options: poise::PrefixFrameworkOptions {
