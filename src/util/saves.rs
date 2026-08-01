@@ -115,6 +115,46 @@ pub fn resolve_lnk(path: &Path) -> Result<PathBuf, Error> {
     })
 }
 
+/// The drive-letter path a shortcut records, if it has one.
+///
+/// A `.lnk` can describe one target twice — as `D:\Games\Foo` and as
+/// `\\HOST\Foo` — and Windows fills in both whenever the folder sits on a local
+/// volume that is also shared. `ShellLink::link_target` returns the network form
+/// whenever it is present and never consults the local one, which routes every
+/// later read and delete through the SMB loopback stack even though nothing
+/// leaves the machine. Share permissions then apply on top of the ACLs, and the
+/// default `Everyone: Read` leaves files readable while deletes come back as
+/// `Access is denied` — with `icacls` looking perfect, because the NTFS ACL was
+/// never what refused.
+///
+/// So: keep operations on local files local. A shortcut with no local path at
+/// all is genuinely remote, and the caller falls back to the network form.
+fn local_target(link: &ShellLink) -> Option<String> {
+    let info = link.link_info().as_ref()?;
+
+    let mut base = info
+        .local_base_path_unicode()
+        .as_deref()
+        .or_else(|| info.local_base_path())?
+        .to_string();
+
+    // One suffix completes either form of the path; the Unicode copy wins where
+    // the shortcut carries one.
+    let suffix = info
+        .common_path_suffix_unicode()
+        .as_deref()
+        .unwrap_or_else(|| info.common_path_suffix());
+
+    if !suffix.is_empty() {
+        if !base.ends_with('\\') {
+            base.push('\\');
+        }
+        base.push_str(suffix);
+    }
+
+    Some(base)
+}
+
 /// The actual parse. Only ever called through [`resolve_lnk`], which contains
 /// panics from the underlying crate.
 fn read_lnk(path: &Path) -> Result<PathBuf, Error> {
@@ -123,10 +163,10 @@ fn read_lnk(path: &Path) -> Result<PathBuf, Error> {
     let link = ShellLink::open(path, lnk::encoding::WINDOWS_1252)
         .map_err(|e| format!("Could not read shortcut {}: {:?}", path.display(), e))?;
 
-    // Builds the full target from the LinkInfo structure, handling local and
-    // network paths and appending the common path suffix.
-    let target = link
-        .link_target()
+    // Prefer the drive-letter path; `link_target` builds the network one from the
+    // same structure and is the right answer only for a genuinely remote target.
+    let target = local_target(&link)
+        .or_else(|| link.link_target())
         .ok_or_else(|| format!("Shortcut {} has no resolvable target path", path.display()))?;
 
     let target = PathBuf::from(target);
