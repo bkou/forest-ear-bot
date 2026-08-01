@@ -210,14 +210,36 @@ pub fn leaf_is_shortcut(path: &str) -> Result<bool, Error> {
     Ok(with_lnk.exists())
 }
 
-/// Delete a file, or a folder and everything inside it.
-pub fn delete_path(target: &Path) -> Result<(), Error> {
-    if target.is_dir() {
-        std::fs::remove_dir_all(target)?;
-    } else {
-        std::fs::remove_file(target)?;
+/// The game folder a user-facing path sits in: its first segment, resolved.
+///
+/// Only ever a hint. It bounds the search for a process that might be holding a
+/// save open, so a match names the game's own server rather than any program
+/// that happens to run from the same drive.
+pub fn game_dir(path: &str) -> Result<PathBuf, Error> {
+    let path = path.trim().trim_matches('/').replace('\\', "/");
+    // `split` always yields at least one element, so this only sees the empty
+    // string when the path itself was empty.
+    let first = path.split('/').next().unwrap_or_default();
+    if first.is_empty() {
+        return Err("Empty path.".into());
     }
-    Ok(())
+    step(&saves_root()?, first)
+}
+
+/// Delete a file, or a folder and everything inside it.
+///
+/// `game_dir` is passed through to the diagnosis on failure and may be omitted.
+pub fn delete_path(target: &Path, game_dir: Option<&Path>) -> Result<(), Error> {
+    let result = if target.is_dir() {
+        std::fs::remove_dir_all(target)
+    } else {
+        std::fs::remove_file(target)
+    };
+
+    // Diagnose here rather than at the call site. A lock lives and dies with the
+    // process holding it, so the same questions asked even moments later get a
+    // different — usually misleadingly clean — answer.
+    result.map_err(|e| crate::util::locks::diagnose(target, &e, game_dir).into())
 }
 
 /// What a backup message holds: a zipped folder, or one file as-is.

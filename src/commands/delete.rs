@@ -1,4 +1,4 @@
-use crate::util::saves;
+use crate::util::{locks, saves};
 use crate::{Context, Error};
 
 /// Post a folder or file, then delete it.
@@ -27,6 +27,31 @@ pub async fn delete(
 
     let target = saves::resolve(&path)?;
     let kind = saves::Kind::of(&target);
+    let game_dir = saves::game_dir(&path).ok();
+
+    // A save the game server still has open can be read but not deleted, so
+    // without this the command uploads a whole backup and only then discovers it
+    // cannot finish. Check while refusing is still free.
+    let probe_target = target.clone();
+    if let Some(locked) =
+        tokio::task::spawn_blocking(move || locks::first_locked(&probe_target)).await?
+    {
+        let holder = game_dir
+            .as_deref()
+            .and_then(locks::process_under)
+            .map(|process| format!(" `{}` is the likely holder.", process))
+            .unwrap_or_default();
+        ctx.say(format!(
+            "`{}` can't be deleted right now: `{}` is open in another process, so Windows \
+             will refuse to remove it.{} Stop the game server and try again — nothing has \
+             been backed up or deleted.",
+            path,
+            locked.display(),
+            holder
+        ))
+        .await?;
+        return Ok(());
+    }
 
     // Upload first. If this fails the data is still on disk, so nothing is lost
     // — the same ordering that makes restore safe.
@@ -41,8 +66,10 @@ pub async fn delete(
     )
     .await?;
 
-    tokio::task::spawn_blocking(move || saves::delete_path(&target).map_err(|e| format!("{}", e)))
-        .await??;
+    tokio::task::spawn_blocking(move || {
+        saves::delete_path(&target, game_dir.as_deref()).map_err(|e| format!("{}", e))
+    })
+    .await??;
 
     ctx.say(format!("Deleted {} `{}`.", kind.as_str(), path))
         .await?;
